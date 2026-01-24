@@ -1,0 +1,95 @@
+#!/bin/sh
+
+pkg=$2
+prtdir="/usr/ports/$pkg"
+binary=$(command -v $pkg)
+#library=$(ldconfig -p | grep "$pkg")
+manifest="/var/db/aufstieg/list/$pkg"
+confdir="/etc/aufstieg.conf"
+checkdep(){
+    if [ -f "$prtdir/deps.txt" ]; then
+        for depends in $(cat "$prtdir/deps.txt"); do
+            aufstieg asdep "$depends"
+        done
+    fi
+}
+installpkg(){
+    [ "$(id -u)" -ne 0 ] && echo " !! Run it from root stupid gnueblan" && exit 1
+    . "$prtdir/build.sh"
+    cd "$prtdir"
+    echo " ====> installing $(pwd)"
+    set -e
+    curl -kL $srclink -o $filename.tar.gz
+    mkdir "$filename"
+    tar -xvzf $filename.tar.gz -C $filename --strip-components=1
+    cd "$filename"
+    buildinst
+    cd "$prtdir"
+    rm -rf $filename*
+}
+for arg in "$1"; do
+    case $1 in
+        install|"add")
+            if [ -f "$binary" ]; then
+                echo " :: $pkg is already installed!"
+            elif [ -d "$prtdir" ]; then
+                echo -n " :: Install $pkg [y/n] "
+                read ANS
+                case $ANS in
+                    [Yy]*)
+                        checkdep && installpkg
+                    ;;
+                    [Nn]*)
+                        echo " :: Canceled..."
+                    ;;
+                esac
+            elif [ -f "$binary" ] && [ ! -d "$prtdir" ]; then
+                echo " !! $pkg is already installed by third party app!"
+            else
+                echo " !! No $pkg port!"
+            fi
+            ;;
+        installdep|"asdep")
+            if [ -f "$binary" ]; then
+                echo " :: $pkg is already installed!"
+            elif [ -d "$prtdir" ]; then
+                checkdep && installpkg
+            elif [ -f "$binary" ] && [ ! -d "$prtdir" ]; then
+                echo " !! $pkg is already installed by third party app!"
+            else
+                echo " !! No $pkg port!"
+            fi
+            ;;
+        remove|"del")
+            if [ -d "$prtdir" ] && [ -f "$binary" ]; then
+                echo -n " :: Remove $pkg? It can't be undone [y/N] "
+                read ANS
+                case $ANS in
+                    n*)
+                        echo " :: Canceled..."
+                    ;;
+                    y*)
+                        [ "$(id -u)" -ne 0 ] && echo " !! Run it from root stupid gnueblan" && exit 1
+                        if [ -f "$binary" ]; then
+                            echo " :: Deleting ${pkg}..."
+                            rm -f "$binary"
+                            rm -f "$manifest"
+                            echo " :: Done!"
+                        else
+                            echo " :: Unexpected error!"
+                        fi
+                       # echo " :: Deleting ${binary}'s binary..."
+                       # [ -f "$binary" ] && rm -f $binary
+                       # echo " :: Done"
+                    ;;
+                esac
+            elif [ -f "$binary" ] && [ ! -d "$prtdir" ]; then
+                echo " !! Package was installed not from aufstieg. Please do uninstall manually deleting $binary"
+            else
+                echo " !! No such package!"
+            fi
+            ;;
+        info) echo "great pm created by snchart #glorytosnchart" ;;
+        *) echo "gnueblan gnueabi environmnent. wrong command n er"
+    esac
+done
