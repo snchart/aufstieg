@@ -37,7 +37,9 @@ for arg in "$1"; do
                 read ANS
                 case $ANS in
                     [Yy]*)
+                        touch "/tmp/${pkg}_timestamp"
                         checkdep && installpkg
+                        find /usr/local/bin /usr/bin /etc/$pkg /usr/lib /usr/share -newer /tmp/${pkg}_timestamp -not -type d | tee "$manifest"
                     ;;
                     [Nn]*)
                         echo " :: Canceled..."
@@ -90,6 +92,11 @@ for arg in "$1"; do
             fi
             ;;
         info) echo "great pm created by snchart #glorytosnchart" ;;
+        clean)  
+            set -e
+            . "$prtdir/build.sh"
+            rm -rf "$prtdir/$filename"
+        ;;
         *) echo "gnueblan gnueabi environmnent. wrong command n er"
     esac
 done
